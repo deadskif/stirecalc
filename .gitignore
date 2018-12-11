@@ -1,0 +1,11 @@
+*.o
+*.d
+*.a
+*.so
+*.so.*
+
+!.gitignore
+
+.*.sw[po]
+
+stirecalc

@@ -1,0 +1,37 @@
+CC ?= gcc
+CFLAGS ?= -Wall -Wextra -Werror -pedantic -std=c11 -O2 
+LDFLAGS = -O2
+
+# From GNU Coding standarts
+# 7.2.3 Variables for Specifying Commands
+# 7.2.4 DESTDIR: Support for Staged Installs
+# 7.2.5 Variables for Installation Directories
+
+prefix 		?=	/usr/local
+exec_prefix ?=	$(prefix)
+bindir		?=	$(exec_prefix)/bin
+datarootdir ?=  $(prefix)/share
+includedir	?=	$(prefix)/include
+docdir		?=  $(datarootdir)/doc/$(PACKET)
+libdir		?=  $(exec_prefix)/lib
+srcdir		?=	$(CURDIR)
+
+INSTALL_PROGRAM ?= $(INSTALL)
+INSTALL_DATA 	?= $(INSTALL) -m 644
+
+
+OBJS = stirecalc.o
+
+all: stirecalc
+
+%.o : %.c $(MAKEFILE_LIST)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+#%.d: %.c $(MAKEFILE_LIST)
+#	$(CC) -E -MM -MQ $(<:.c=.o) $(CFLAGS) $< -o $@
+
+stirecalc: $(OBJS)
+	$(CC) $(LDFLAGS) $< $(LDLIBS) -o $@
+
+
+
