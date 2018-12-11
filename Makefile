@@ -1,6 +1,7 @@
 CC ?= gcc
 CFLAGS ?= -Wall -Wextra -Werror -pedantic -std=c11 -O2 
 LDFLAGS = -O2
+LDLIBS = -lm
 
 # From GNU Coding standarts
 # 7.2.3 Variables for Specifying Commands
