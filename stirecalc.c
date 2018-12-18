@@ -75,12 +75,12 @@ enum wheel_flags {
 
 #define ISO_REGEX \
     "^[P]?" ISO_TIRE_WIDTH "(" SPACES_OR_SLASH "+" \
-    ISO_ASPECT_RATIO SPACES_OR_SLASH "*)?" SPACES TIRE_CARCASS \
+    ISO_ASPECT_RATIO ")?" SPACES "(" SPACES_OR_SLASH "*" TIRE_CARCASS "?)" \
     SPACES RIM_DIAMETER "$"
 
 #define LT_REGEX \
     "(" LT_TIRE_DIAMETER SPACES "x" ")?" SPACES LT_TIRE_WIDTH \
-     SPACES TIRE_CARCASS SPACES RIM_DIAMETER "$"
+     SPACES TIRE_CARCASS "?" SPACES RIM_DIAMETER "$"
 
 #define DEBUG_MATCH(STR, MATCHES, N) do { \
     char __buf[1024] = {0}; \
@@ -161,8 +161,8 @@ static const char *parse_wheel(const char *str, struct wheel *w) {
         w->iso.aspect_ratio = get_int(str, match, 3);
         if (w->iso.aspect_ratio == 0)
             w->iso.aspect_ratio = ASPECT_RATIO_ISO_DEFAULT;
-        w->iso.rim_diameter = get_float(str, match, 5);
-        w->tire_type = get_char(str, match, 4);
+        w->iso.rim_diameter = get_float(str, match, 6);
+        w->tire_type = get_char(str, match, 5);
     } else if ((ret = regexec(&lt, str, MAX_MATCH, match, 0)) == 0) {
         //printf("LT match\n");
         parsed = true;
@@ -299,6 +299,8 @@ int main(int argc, const char *argv[])
         printf(" -> ");
         print_wheel(&wheel, (wheel.type == WHEEL_LT) ? WHEEL_ISO : WHEEL_LT);
         printf("\n");
+    } else {
+        printf("Unknown tire: %s\n", argv[1]);
     }
     return 0;
 }
