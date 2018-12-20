@@ -16,49 +16,37 @@
  *   You should have received a copy of the GNU General Public License
  *   along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
  */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
+#include <error.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 
 #include <sys/types.h>
 #include <regex.h>
 
+#include "stirecalc.h"
+#include "oem_tires.h"
+
+static struct {
+    bool c; /* Compare */
+    bool l; /* List OEM tires */
+} opts = {
+    .c = false,
+    .l = false,
+};
 #define ASPECT_RATIO_ISO_DEFAULT    82      /* %  */
 #define ASPECT_RATIO_LT_ZERO        92      /* %  */
 #define APPECT_RATIO_LT_NZERO       82      /* %  */
 
 #define MM_IN_INCH  25.4f
-struct wheel {
-    enum { 
-        WHEEL_UNKNOWN, WHEEL_ISO, WHEEL_LT 
-    } type;
-    enum tire_type {
-        TIRE_UNKNOWN,
-        TIRE_RADIAL = 'R',
-        TIRE_DIAGONAL = 'D',
-        TIRE_BIAS_BELT = 'B',
-        TIRE_DASH = '-',
-    } tire_type;
-
-    union {
-        struct wheel_iso {
-            unsigned tire_width;   /* mm */
-            unsigned aspect_ratio; /* %  */
-            float rim_diameter; /* in */
-        } iso;
-        struct wheel_lt {
-            float diameter;     /* in */
-            float tire_width;   /* in */
-            float rim_diameter; /* in */
-        } lt;
-    };
-    unsigned flags;
-};
 enum wheel_flags {
     WHEELF_PASSENGER = 0x1,
 };
@@ -232,7 +220,7 @@ static float calc_iso_aspect_ratio(const struct wheel *src, float tire_width)
 {
     float h = (src->lt.diameter - src->iso.rim_diameter) / 2.;
     h *= MM_IN_INCH;
-    float ar = (tire_width / h) * 100.;
+    float ar = (h / tire_width) * 100.;
     return roundf(ar / 5.) * 5.;
 }
 static bool convert_wheel(struct wheel *dst, const struct wheel *src, unsigned to)
@@ -263,7 +251,7 @@ static bool convert_wheel(struct wheel *dst, const struct wheel *src, unsigned t
     }
     return true;
 }
-static int print_wheel(const struct wheel *wheel, unsigned system)
+int print_wheel(const struct wheel *wheel, unsigned system)
 {
     struct wheel tmp = {0};
     if (!convert_wheel(&tmp, wheel, system))
@@ -283,24 +271,68 @@ static int print_wheel(const struct wheel *wheel, unsigned system)
     return 0;
 }
 
-static void ltage(void) {
-    printf("Usage: stirecalc <tire_size>\n");
+static void usage(void)
+{
+    printf("Usage: %s [-chl] <tire_size> [<tire_sizes>]\n", program_invocation_name);
     exit(1);
 }
-int main(int argc, const char *argv[])
+static int translate(const char *s)
 {
-    struct wheel wheel;
-
-    if (argc != 2)
-        ltage();
-    
-    if (parse_wheel(argv[1], &wheel) != NULL) {
+    struct wheel wheel = {0};
+    if (parse_wheel(s, &wheel) != NULL) {
         print_wheel(&wheel, wheel.type);
         printf(" -> ");
         print_wheel(&wheel, (wheel.type == WHEEL_LT) ? WHEEL_ISO : WHEEL_LT);
         printf("\n");
-    } else {
-        printf("Unknown tire: %s\n", argv[1]);
+        return 0;
+    } 
+    printf("Unknown tire: %s\n", s);
+    return -1;
+}
+static int compare(int n, char *s[])
+{
+    struct wheel wheel[n];
+    for (int i = 0; i < n; i++, s++)
+    {
+        if (parse_wheel(*s, wheel + i) == NULL) {
+            printf("Unknown tire: %s\n", *s);
+        }
     }
+    error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s()", __func__);
+    return -1;
+}
+int main(int argc, char *argv[])
+{
+    int opt;
+    while ((opt = getopt(argc, argv, "chl")) != -1) {
+        switch (opt) {
+            case 'c':
+                opts.c = true;
+                break;
+            case 'l':
+                opts.l = true;
+                break;
+            case 'h':
+            case '?':
+            default:
+                usage();
+                break;
+        }
+    }
+
+    argc -= optind;
+    argv += optind;
+
+    if (opts.c) {
+        compare(argc, argv);
+    } else if (opts.l) {
+        print_all_oem_wheels();
+    } else {
+        printf("%s() argc %d, argv %s\n", __func__, argc, *argv);
+        for (; argc; argc--, argv++) {
+            translate(*argv);
+        }
+    };
+    
     return 0;
 }

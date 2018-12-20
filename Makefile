@@ -24,7 +24,7 @@ INSTALL_PROGRAM ?= $(INSTALL)
 INSTALL_DATA 	?= $(INSTALL) -m 644
 
 
-OBJS = stirecalc.o #strhelpers.o
+OBJS = stirecalc.o oem_tires.o #strhelpers.o
 DEPS = $(OBJS:.o=.d)
 
 .SUFFIXES: .y .l
@@ -39,7 +39,7 @@ all: stirecalc
 	$(CC) -E -MM -MQ $(<:.c=.o) $(CFLAGS) $< -o $@
 
 stirecalc: $(OBJS)
-	$(CC) $(LDFLAGS) $< $(LDLIBS) -o $@
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 clean:
 	rm $(OBJS) $(DEPS) stirecalc
