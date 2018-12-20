@@ -213,16 +213,34 @@ static float calc_lt_width(const struct wheel *src)
 }
 static float calc_iso_width(const struct wheel *src)
 {
+    if (src->type == WHEEL_ISO)
+        return src->iso.tire_width;
     float w = src->lt.tire_width * MM_IN_INCH;
     return roundf(w / 5.) * 5.; 
 }
 static float calc_iso_aspect_ratio(const struct wheel *src, float tire_width)
 {
+    if (src->type == WHEEL_ISO)
+        return src->iso.aspect_ratio;
     float h = (src->lt.diameter - src->iso.rim_diameter) / 2.;
     h *= MM_IN_INCH;
     float ar = (h / tire_width) * 100.;
     return roundf(ar / 5.) * 5.;
 }
+#if 0
+static float calc_rim_diameter(const struct wheel *src)
+{
+    if (src->type == WHEEL_ISO)
+        return src->iso.rim_diameter;
+    return src->lt.rim_diameter;
+}
+static float calc_tire_height_mm(const struct wheel *src)
+{
+    if (src->type == WHEEL_ISO)
+        return src->iso.tire_width * src->iso.aspect_ratio / 100.;
+    return (src->lt.diameter - src->lt.rim_diameter) / 2. / MM_IN_INCH;
+}
+#endif
 static bool convert_wheel(struct wheel *dst, const struct wheel *src, unsigned to)
 {
     if (src->type == to) {
@@ -251,24 +269,27 @@ static bool convert_wheel(struct wheel *dst, const struct wheel *src, unsigned t
     }
     return true;
 }
-int print_wheel(const struct wheel *wheel, unsigned system)
+int snprint_wheel(char *str, size_t size, const struct wheel *wheel, unsigned system)
 {
     struct wheel tmp = {0};
+    int ret = 0;
     if (!convert_wheel(&tmp, wheel, system))
         return 0;
 
     if (tmp.type == WHEEL_ISO) {
-        printf("%u/%u%s%.0f", tmp.iso.tire_width,
+        ret = snprintf(str, size, "%u/%u%s%.0f",
+                tmp.iso.tire_width,
                 tmp.iso.aspect_ratio,
                 tire_type_char(&tmp),
                 tmp.iso.rim_diameter);
     } else {
-        printf("%.1fx%.2f%s%.0f",tmp.lt.diameter,
+        ret = snprintf(str, size, "%.1fx%.2f%s%.0f",
+                tmp.lt.diameter,
                 tmp.lt.tire_width,
                 tire_type_char(&tmp),
                 tmp.lt.rim_diameter);
     }
-    return 0;
+    return ret;
 }
 
 static void usage(void)
@@ -289,17 +310,63 @@ static int translate(const char *s)
     printf("Unknown tire: %s\n", s);
     return -1;
 }
-static int compare(int n, char *s[])
+static int compare(size_t n, char *s[])
 {
     struct wheel wheel[n];
-    for (int i = 0; i < n; i++, s++)
+    float diam0, diam_diff;
+    char buf[21];
+    for (size_t i = 0; i < n; i++)
     {
-        if (parse_wheel(*s, wheel + i) == NULL) {
-            printf("Unknown tire: %s\n", *s);
+        if (parse_wheel(s[i], wheel + i) == NULL) {
+            printf("Unknown tire: %s\n", s[i]);
         }
     }
-    error_at_line(0, ENOSYS, __FILE__, __LINE__, "%s()", __func__);
-    return -1;
+
+    assert(n > 1);
+
+    for (size_t i = 0; i < n; i++)
+    {
+        snprint_wheel(buf, sizeof(buf), wheel + i, WHEEL_ISO);
+        printf("%-20s", buf);
+    }
+    printf("\n");
+    for (size_t i = 0; i < n; i++)
+    {
+        snprint_wheel(buf, sizeof(buf), wheel + i, WHEEL_LT);
+        printf("%-20s", buf);
+    }
+    printf("\n");
+    diam0 = calc_lt_diameter(wheel);
+
+    printf("%-20s",  "Diam");
+    for (size_t i = 1; i < n; i++)
+    {
+        diam_diff = calc_lt_diameter(wheel+i) - diam0;
+        snprintf(buf, sizeof(buf), "%+.1f in %+.1f%%", 
+                diam_diff, diam_diff / diam0 * 100.);
+        printf("%-20s", buf);
+    }
+    printf("\n");
+
+    printf("%-20s",  "Clearance");
+    for (size_t i = 1; i < n; i++)
+    {
+        diam_diff = calc_lt_diameter(wheel+i) - diam0;
+        snprintf(buf, sizeof(buf), "%+.1f mm",
+                diam_diff / 2. * MM_IN_INCH);
+        printf("%-20s", buf);
+    };
+    printf("\n");
+
+    printf("%-20s",  "Tire width");
+    for (size_t i = 1; i < n; i++)
+    {
+        snprintf(buf, sizeof(buf), "%+.1f mm",
+                calc_iso_width(wheel+i) - calc_iso_width(wheel));
+        printf("%-20s", buf);
+    }
+    printf("\n");
+    return 0;
 }
 int main(int argc, char *argv[])
 {
@@ -324,7 +391,10 @@ int main(int argc, char *argv[])
     argv += optind;
 
     if (opts.c) {
-        compare(argc, argv);
+        if (argc <= 1)
+            usage();
+
+        compare((size_t)argc, argv);
     } else if (opts.l) {
         print_all_oem_wheels();
     } else {
