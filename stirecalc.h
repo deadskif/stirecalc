@@ -3,9 +3,9 @@
 #define STIRECALC_H
 #include <stdio.h>
 
-struct wheel {
+struct stirec_tire {
     enum { 
-        WHEEL_UNKNOWN, WHEEL_ISO, WHEEL_LT 
+        TIRECODE_UNKNOWN, TIRECODE_ISO, TIRECODE_LT 
     } type;
     enum tire_type {
         TIRE_UNKNOWN,
@@ -16,12 +16,12 @@ struct wheel {
     } tire_type;
 
     union {
-        struct wheel_iso {
+        struct stirec_tire_iso {
             unsigned tire_width;   /* mm */
             unsigned aspect_ratio; /* %  */
             float rim_diameter; /* in */
         } iso;
-        struct wheel_lt {
+        struct stirec_tire_lt {
             float diameter;     /* in */
             float tire_width;   /* in */
             float rim_diameter; /* in */
@@ -30,8 +30,8 @@ struct wheel {
     unsigned flags;
 };
 
-#define INIT_WHEEL_ISO_R(TW, AR, RD) { \
-    .type = WHEEL_ISO, \
+#define INIT_TIRECODE_ISO_R(TW, AR, RD) { \
+    .type = TIRECODE_ISO, \
     .tire_type = TIRE_RADIAL, \
     .iso = { \
         .tire_width = (TW), \
@@ -39,14 +39,14 @@ struct wheel {
         .rim_diameter = (RD), \
     }, \
 }
-#define INIT_WHEEL_UNKNOWN { \
-    .type = WHEEL_UNKNOWN, \
+#define INIT_TIRECODE_UNKNOWN { \
+    .type = TIRECODE_UNKNOWN, \
 }
-int snprint_wheel(char *str, size_t size, const struct wheel *wheel, unsigned system);
-static inline int print_wheel(const struct wheel *wheel, unsigned system) {
+int snprint_tire(char *str, size_t size, const struct stirec_tire *tire, unsigned system);
+static inline int print_tire(const struct stirec_tire *tire, unsigned system) {
     char buf[512];
     int ret;
-    if ((ret = snprint_wheel(buf, sizeof(buf), wheel, system)) > 0)
+    if ((ret = snprint_tire(buf, sizeof(buf), tire, system)) > 0)
         ret = printf("%s", buf);
     return ret;
 }

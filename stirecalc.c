@@ -47,7 +47,7 @@ static struct {
 #define APPECT_RATIO_LT_NZERO       82      /* %  */
 
 #define MM_IN_INCH  25.4f
-enum wheel_flags {
+enum tire_flags {
     WHEELF_PASSENGER = 0x1,
 };
 
@@ -114,7 +114,7 @@ static inline int get_char(const char *str, regmatch_t *match, size_t n)
     return *start;
 }
 
-static const char *parse_wheel(const char *str, struct wheel *w) {
+static const char *parse_tire(const char *str, struct stirec_tire *w) {
     regex_t iso;
     regex_t lt;
     int ret;
@@ -122,7 +122,7 @@ static const char *parse_wheel(const char *str, struct wheel *w) {
     regmatch_t match[MAX_MATCH];
     bool parsed = false;
 
-    memset(w, 0, sizeof(struct wheel));
+    memset(w, 0, sizeof(struct stirec_tire));
     if ((ret = regcomp(&iso, ISO_REGEX, REG_EXTENDED)) != 0)
     {
         char errbuf[1024];
@@ -143,7 +143,7 @@ static const char *parse_wheel(const char *str, struct wheel *w) {
     if ((ret = regexec(&iso, str, MAX_MATCH, match, 0)) == 0) {
         //printf("ISO match\n");
         parsed = true;
-        w->type = WHEEL_ISO;
+        w->type = TIRECODE_ISO;
         //DEBUG_ALL_MATCH(str, match, MAX_MATCH);
         w->iso.tire_width = get_int(str, match, 1);
         w->iso.aspect_ratio = get_int(str, match, 3);
@@ -154,7 +154,7 @@ static const char *parse_wheel(const char *str, struct wheel *w) {
     } else if ((ret = regexec(&lt, str, MAX_MATCH, match, 0)) == 0) {
         //printf("LT match\n");
         parsed = true;
-        w->type = WHEEL_LT;
+        w->type = TIRECODE_LT;
         //DEBUG_ALL_MATCH(str, match, MAX_MATCH);
         w->lt.diameter = get_float(str, match, 2);
         w->lt.tire_width = get_float(str, match, 4);
@@ -179,7 +179,7 @@ clean_iso:
     regfree(&iso);
     return parsed ? str : NULL;
 }
-static const char *tire_type_char(const struct wheel *w) {
+static const char *tire_type_char(const struct stirec_tire *w) {
     switch (w->tire_type) {
         case TIRE_RADIAL:
             return "R";
@@ -194,33 +194,37 @@ static const char *tire_type_char(const struct wheel *w) {
             return "-";
             break;
         case TIRE_UNKNOWN:
-            return (w->type == WHEEL_ISO) ? "/" : " ";
+            return (w->type == TIRECODE_ISO) ? "/" : " ";
             break;
     }
     fprintf(stderr, "Bad tire type: %c\n", w->tire_type);
     return "Error";
 }
-static float calc_lt_diameter(const struct wheel *src)
+static float calc_lt_diameter(const struct stirec_tire *src)
 {
+    if (src->type == TIRECODE_LT)
+        return src->lt.diameter;
     float tire_h = src->iso.tire_width * (src->iso.aspect_ratio / 100.) / MM_IN_INCH;
     float d = tire_h * 2. + src->iso.rim_diameter;
     return roundf(d * 10.) / 10.;
 }
-static float calc_lt_width(const struct wheel *src)
+static float calc_lt_width(const struct stirec_tire *src)
 {
+    if (src->type == TIRECODE_LT)
+        return src->lt.tire_width;
     float w = src->iso.tire_width / MM_IN_INCH;
     return roundf(w * 10.) / 10.;
 }
-static float calc_iso_width(const struct wheel *src)
+static float calc_iso_width(const struct stirec_tire *src)
 {
-    if (src->type == WHEEL_ISO)
+    if (src->type == TIRECODE_ISO)
         return src->iso.tire_width;
     float w = src->lt.tire_width * MM_IN_INCH;
     return roundf(w / 5.) * 5.; 
 }
-static float calc_iso_aspect_ratio(const struct wheel *src, float tire_width)
+static float calc_iso_aspect_ratio(const struct stirec_tire *src, float tire_width)
 {
-    if (src->type == WHEEL_ISO)
+    if (src->type == TIRECODE_ISO)
         return src->iso.aspect_ratio;
     float h = (src->lt.diameter - src->iso.rim_diameter) / 2.;
     h *= MM_IN_INCH;
@@ -228,37 +232,37 @@ static float calc_iso_aspect_ratio(const struct wheel *src, float tire_width)
     return roundf(ar / 5.) * 5.;
 }
 #if 0
-static float calc_rim_diameter(const struct wheel *src)
+static float calc_rim_diameter(const struct stirec_tire *src)
 {
-    if (src->type == WHEEL_ISO)
+    if (src->type == TIRECODE_ISO)
         return src->iso.rim_diameter;
     return src->lt.rim_diameter;
 }
-static float calc_tire_height_mm(const struct wheel *src)
+static float calc_tire_height_mm(const struct stirec_tire *src)
 {
-    if (src->type == WHEEL_ISO)
+    if (src->type == TIRECODE_ISO)
         return src->iso.tire_width * src->iso.aspect_ratio / 100.;
     return (src->lt.diameter - src->lt.rim_diameter) / 2. / MM_IN_INCH;
 }
 #endif
-static bool convert_wheel(struct wheel *dst, const struct wheel *src, unsigned to)
+static bool convert_tire(struct stirec_tire *dst, const struct stirec_tire *src, unsigned to)
 {
     if (src->type == to) {
-        memcpy(dst, src, sizeof(struct wheel));
+        memcpy(dst, src, sizeof(struct stirec_tire));
         return true;
     }
     dst->type = to;
     dst->tire_type = src->tire_type;
     switch (to) {
-        case WHEEL_ISO:
-            assert(src->type == WHEEL_LT);
+        case TIRECODE_ISO:
+            assert(src->type == TIRECODE_LT);
             dst->iso.tire_width = calc_iso_width(src);
             dst->iso.aspect_ratio = calc_iso_aspect_ratio(src,
                     dst->iso.tire_width);
             dst->iso.rim_diameter = src->lt.rim_diameter;
             break;
-        case WHEEL_LT:
-            assert(src->type == WHEEL_ISO);
+        case TIRECODE_LT:
+            assert(src->type == TIRECODE_ISO);
             dst->lt.diameter = calc_lt_diameter(src);
             dst->lt.tire_width = calc_lt_width(src);
             dst->lt.rim_diameter = src->iso.rim_diameter;
@@ -269,14 +273,14 @@ static bool convert_wheel(struct wheel *dst, const struct wheel *src, unsigned t
     }
     return true;
 }
-int snprint_wheel(char *str, size_t size, const struct wheel *wheel, unsigned system)
+int snprint_tire(char *str, size_t size, const struct stirec_tire *tire, unsigned system)
 {
-    struct wheel tmp = {0};
+    struct stirec_tire tmp = {0};
     int ret = 0;
-    if (!convert_wheel(&tmp, wheel, system))
+    if (!convert_tire(&tmp, tire, system))
         return 0;
 
-    if (tmp.type == WHEEL_ISO) {
+    if (tmp.type == TIRECODE_ISO) {
         ret = snprintf(str, size, "%u/%u%s%.0f",
                 tmp.iso.tire_width,
                 tmp.iso.aspect_ratio,
@@ -299,11 +303,11 @@ static void usage(void)
 }
 static int translate(const char *s)
 {
-    struct wheel wheel = {0};
-    if (parse_wheel(s, &wheel) != NULL) {
-        print_wheel(&wheel, wheel.type);
+    struct stirec_tire tire = {0};
+    if (parse_tire(s, &tire) != NULL) {
+        print_tire(&tire, tire.type);
         printf(" -> ");
-        print_wheel(&wheel, (wheel.type == WHEEL_LT) ? WHEEL_ISO : WHEEL_LT);
+        print_tire(&tire, (tire.type == TIRECODE_LT) ? TIRECODE_ISO : TIRECODE_LT);
         printf("\n");
         return 0;
     } 
@@ -312,12 +316,12 @@ static int translate(const char *s)
 }
 static int compare(size_t n, char *s[])
 {
-    struct wheel wheel[n];
+    struct stirec_tire tire[n];
     float diam0, diam_diff;
     char buf[21];
     for (size_t i = 0; i < n; i++)
     {
-        if (parse_wheel(s[i], wheel + i) == NULL) {
+        if (parse_tire(s[i], tire + i) == NULL) {
             printf("Unknown tire: %s\n", s[i]);
         }
     }
@@ -326,22 +330,35 @@ static int compare(size_t n, char *s[])
 
     for (size_t i = 0; i < n; i++)
     {
-        snprint_wheel(buf, sizeof(buf), wheel + i, WHEEL_ISO);
+        snprint_tire(buf, sizeof(buf), tire + i, TIRECODE_ISO);
         printf("%-20s", buf);
     }
     printf("\n");
+
+#if 0
     for (size_t i = 0; i < n; i++)
     {
-        snprint_wheel(buf, sizeof(buf), wheel + i, WHEEL_LT);
+        snprint_tire(buf, sizeof(buf), tire + i, TIRECODE_LT);
         printf("%-20s", buf);
     }
     printf("\n");
-    diam0 = calc_lt_diameter(wheel);
+#endif
+
+    diam0 = calc_lt_diameter(tire);
+
+    for (size_t i = 0; i < n; i++)
+    {
+        diam_diff = calc_lt_diameter(tire+i);
+        snprintf(buf, sizeof(buf), "D%.1f", 
+                diam_diff);
+        printf("%-20s", buf);
+    }
+    printf("\n");
 
     printf("%-20s",  "Diam");
     for (size_t i = 1; i < n; i++)
     {
-        diam_diff = calc_lt_diameter(wheel+i) - diam0;
+        diam_diff = calc_lt_diameter(tire+i) - diam0;
         snprintf(buf, sizeof(buf), "%+.1f in %+.1f%%", 
                 diam_diff, diam_diff / diam0 * 100.);
         printf("%-20s", buf);
@@ -351,7 +368,7 @@ static int compare(size_t n, char *s[])
     printf("%-20s",  "Clearance");
     for (size_t i = 1; i < n; i++)
     {
-        diam_diff = calc_lt_diameter(wheel+i) - diam0;
+        diam_diff = calc_lt_diameter(tire+i) - diam0;
         snprintf(buf, sizeof(buf), "%+.1f mm",
                 diam_diff / 2. * MM_IN_INCH);
         printf("%-20s", buf);
@@ -362,7 +379,7 @@ static int compare(size_t n, char *s[])
     for (size_t i = 1; i < n; i++)
     {
         snprintf(buf, sizeof(buf), "%+.1f mm",
-                calc_iso_width(wheel+i) - calc_iso_width(wheel));
+                calc_iso_width(tire+i) - calc_iso_width(tire));
         printf("%-20s", buf);
     }
     printf("\n");
@@ -396,7 +413,7 @@ int main(int argc, char *argv[])
 
         compare((size_t)argc, argv);
     } else if (opts.l) {
-        print_all_oem_wheels();
+        print_all_oem_tires();
     } else {
         printf("%s() argc %d, argv %s\n", __func__, argc, *argv);
         for (; argc; argc--, argv++) {
