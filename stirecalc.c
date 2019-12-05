@@ -38,13 +38,16 @@
 static struct {
     bool c; /* Compare */
     bool l; /* List OEM tires */
+    int ar_force; /* Force default aspect ratio */
 } opts = {
     .c = false,
     .l = false,
+    .ar_force = 0,
 };
-#define ASPECT_RATIO_ISO_DEFAULT    82      /* %  */
-#define ASPECT_RATIO_LT_ZERO        92      /* %  */
-#define APPECT_RATIO_LT_NZERO       82      /* %  */
+#define ASPECT_RATIO_DEFAULT(X) (opts.ar_force ? opts.ar_force : (X))
+#define ASPECT_RATIO_ISO_DEFAULT ASPECT_RATIO_DEFAULT(82) /* % */
+#define ASPECT_RATIO_LT_ZERO     ASPECT_RATIO_DEFAULT(92) /* % */
+#define APPECT_RATIO_LT_NZERO    ASPECT_RATIO_DEFAULT(82) /* % */
 
 #define MM_IN_INCH  25.4f
 enum tire_flags {
@@ -298,7 +301,7 @@ int snprint_tire(char *str, size_t size, const struct stirec_tire *tire, unsigne
 
 static void usage(void)
 {
-    printf("Usage: %s [-chl] <tire_size> [<tire_sizes>]\n", program_invocation_name);
+    printf("Usage: %s [-chl189] <tire_size> [<tire_sizes>]\n", program_invocation_name);
     exit(1);
 }
 static int translate(const char *s)
@@ -387,13 +390,22 @@ static int compare(size_t n, char *s[])
 int main(int argc, char *argv[])
 {
     int opt;
-    while ((opt = getopt(argc, argv, "chl")) != -1) {
+    while ((opt = getopt(argc, argv, "chl189")) != -1) {
         switch (opt) {
             case 'c':
                 opts.c = true;
                 break;
             case 'l':
                 opts.l = true;
+                break;
+            case '1':
+                opts.ar_force = 100;
+                break;
+            case '8':
+                opts.ar_force = 80;
+                break;
+            case '9':
+                opts.ar_force = 90;
                 break;
             case 'h':
             case '?':
