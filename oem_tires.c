@@ -32,6 +32,7 @@ const struct oem_tire oem_tires[] = {
     OEM_TIRES("UAZ", "Hunter", &iso225_75R16),
     OEM_TIRES("UAZ", "Patriot", &iso225_75R16, ISOR(235, 70, 16), ISOR(245, 70, 16), ISOR(245, 60, 18)),
     OEM_TIRES("Chevrolet", "Niva", ISOR(205, 75, 15), &iso205_70R15, &iso215_65R16),
+    OEM_TIRES("Toyota", "Fortuner", ISOR(265, 65, 17), ISOR(265, 60, 80)),
 };
 
 int print_all_oem_tires(void)

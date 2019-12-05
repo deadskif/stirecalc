@@ -344,22 +344,21 @@ static int compare(size_t n, char *s[])
     printf("\n");
 #endif
 
-    diam0 = calc_lt_diameter(tire);
 
     for (size_t i = 0; i < n; i++)
     {
-        diam_diff = calc_lt_diameter(tire+i);
-        snprintf(buf, sizeof(buf), "D%.1f", 
-                diam_diff);
+        snprintf(buf, sizeof(buf), "%.1fx%.1f", 
+                calc_lt_diameter(tire+i), calc_lt_width(tire+i));
         printf("%-20s", buf);
     }
     printf("\n");
 
+    diam0 = calc_lt_diameter(tire);
     printf("%-20s",  "Diam");
     for (size_t i = 1; i < n; i++)
     {
         diam_diff = calc_lt_diameter(tire+i) - diam0;
-        snprintf(buf, sizeof(buf), "%+.1f in %+.1f%%", 
+        snprintf(buf, sizeof(buf), "%+.1f\" %+.1f%%", 
                 diam_diff, diam_diff / diam0 * 100.);
         printf("%-20s", buf);
     }
